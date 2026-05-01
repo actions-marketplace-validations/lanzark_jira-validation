@@ -120,36 +120,6 @@ module.exports = async ({ github, context, core }) => {
   });
   await core.summary.addRaw(md).write();
 
-  // --- Publish Check Run only when validation fails (visible via "Details" link on PR) ---
-  if (failed) {
-    const serverUrl = process.env.GITHUB_SERVER_URL || 'https://github.com';
-    const runId = process.env.GITHUB_RUN_ID || '';
-    const detailsUrl = runId
-      ? `${serverUrl}/${owner}/${repo}/actions/runs/${runId}`
-      : undefined;
-
-    try {
-      await github.rest.checks.create({
-        owner,
-        repo,
-        name: 'report',
-        head_sha: pr.head.sha,
-        status: 'completed',
-        conclusion: 'failure',
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-        ...(detailsUrl && { details_url: detailsUrl }),
-        ...(runId && { external_id: runId }),
-        output: {
-          title: 'report',
-          summary: md,
-        },
-      });
-    } catch (err) {
-      core.warning(`Could not create check run (needs "checks: write" permission): ${err.message}`);
-    }
-  }
-
   // --- Final status ---
   if (failed) {
     core.setFailed(`One or more JIRA validation checks failed. Expected pattern: ${pattern}`);
