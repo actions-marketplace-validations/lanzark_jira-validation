@@ -40,7 +40,6 @@ function makeMocks({
     paginate: jest.fn().mockResolvedValue(commits),
     rest: {
       pulls: { listCommits: jest.fn() },
-      checks: { create: jest.fn().mockResolvedValue({}) },
     },
   };
 
@@ -541,90 +540,6 @@ describe('markdown summary', () => {
 
     const md = core.summary.addRaw.mock.calls[0][0];
     expect(md).toContain('fix \\| operator');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Check run (inline report on PR)
-// ---------------------------------------------------------------------------
-
-describe('check run report', () => {
-  test('does not create a check run on success', async () => {
-    const { core, context, github } = makeMocks();
-    await validate({ github, context, core });
-
-    expect(github.rest.checks.create).not.toHaveBeenCalled();
-  });
-
-  test('creates a failing check run on failure', async () => {
-    const { core, context, github } = makeMocks({
-      branch: 'bad-branch',
-    });
-    await validate({ github, context, core });
-
-    expect(github.rest.checks.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        owner: 'lanzark',
-        repo: 'my-repo',
-        name: 'report',
-        head_sha: 'abc123def456',
-        status: 'completed',
-        conclusion: 'failure',
-        details_url: 'https://github.com/lanzark/my-repo/actions/runs/12345',
-        external_id: '12345',
-        output: expect.objectContaining({
-          title: 'report',
-        }),
-      })
-    );
-  });
-
-  test('includes markdown summary in check run output', async () => {
-    const { core, context, github } = makeMocks({
-      branch: 'bad-branch',
-    });
-    await validate({ github, context, core });
-
-    const call = github.rest.checks.create.mock.calls[0][0];
-    expect(call.output.summary).toContain('JIRA Validation Failed');
-  });
-
-  test('includes started_at and completed_at timestamps', async () => {
-    const { core, context, github } = makeMocks({
-      branch: 'bad-branch',
-    });
-    await validate({ github, context, core });
-
-    const call = github.rest.checks.create.mock.calls[0][0];
-    expect(call.started_at).toBeDefined();
-    expect(call.completed_at).toBeDefined();
-    expect(() => new Date(call.started_at)).not.toThrow();
-    expect(() => new Date(call.completed_at)).not.toThrow();
-  });
-
-  test('omits details_url and external_id when GITHUB_RUN_ID is not set', async () => {
-    const { core, context, github } = makeMocks({
-      branch: 'bad-branch',
-    });
-    delete process.env.GITHUB_RUN_ID;
-    await validate({ github, context, core });
-
-    const call = github.rest.checks.create.mock.calls[0][0];
-    expect(call.details_url).toBeUndefined();
-    expect(call.external_id).toBeUndefined();
-  });
-
-  test('warns but does not fail if checks.create throws', async () => {
-    const { core, context, github } = makeMocks({
-      branch: 'bad-branch',
-    });
-    github.rest.checks.create.mockRejectedValue(new Error('Forbidden'));
-    await validate({ github, context, core });
-
-    expect(core.warning).toHaveBeenCalledWith(
-      expect.stringContaining('checks: write')
-    );
-    expect(core.setFailed).toHaveBeenCalled();
   });
 });
 
